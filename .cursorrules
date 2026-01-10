@@ -1,0 +1,326 @@
+# CH Health OS — Cursor Rules
+
+## Project Context
+Private, family-centered health operating system. Rules-first AI assistance for daily health adherence.
+
+**Tech Stack:**
+- Backend: FastAPI + SQLAlchemy + LangGraph → Render
+- Frontend: Next.js 14 (App Router) → Vercel
+- Database: Supabase (Postgres)
+- Bot: Telegram
+- Auth: Supabase Auth
+
+**User Profile:**
+- Python beginner
+- Needs teaching-first approach with detailed explanations
+- Prefers understanding "why" not just "what"
+
+---
+
+## Core Principles
+
+1. **Teaching Mode Always Active**
+   - Explain complex concepts with comments
+   - Link to official documentation
+   - Explain trade-offs in architectural decisions
+   - Don't assume prior knowledge
+
+2. **Rules > AI**
+   - Health logic must be rules-based and traceable
+   - AI assists conversation, not health decisions
+   - Every score/calculation must be explainable
+
+3. **Type Safety Required**
+   - Use SQLAlchemy ORM (not raw SQL)
+   - Type hints required on all functions
+   - Pydantic models for API schemas
+   - MyPy strict mode
+
+4. **Test Continuously**
+   - Write tests alongside code
+   - Target: 80% coverage for core logic
+   - Run pytest after each meaningful change
+
+---
+
+## Code Standards
+
+### Python Style
+- Formatter: Black (line length 100)
+- Linter: Ruff
+- Type checker: MyPy (strict)
+- Docstrings: Google style for complex functions
+
+### Naming Conventions
+```python
+# Classes: PascalCase
+class RoutineService:
+    pass
+
+# Functions: snake_case with type hints
+def get_active_routines(user_id: UUID) -> List[Routine]:
+    """Get all active routines for user.
+    
+    Args:
+        user_id: User UUID
+        
+    Returns:
+        List of active Routine objects
+    """
+    pass
+
+# Constants: UPPER_SNAKE_CASE
+MAX_RETRY_ATTEMPTS = 3
+
+# Private: _leading_underscore
+def _internal_helper() -> None:
+    pass
+```
+
+### Database
+- Use SQLAlchemy ORM (type safety)
+- Never use raw SQL strings (SQL injection risk)
+- Always use `.where()` with model attributes
+- RLS policies on all user-facing tables
+
+---
+
+## File Structure
+
+```
+backend/app/
+├── main.py              # FastAPI app
+├── core/               # Config, database, security
+├── api/routes/         # REST endpoints
+├── services/           # Business logic (RoutineService, etc.)
+├── agents/             # LangGraph agents (Vita)
+├── models/             # SQLAlchemy models
+└── schemas/            # Pydantic schemas
+
+working_sessions/
+├── YYYY-MM-DD/         # Daily notes (gitignored)
+└── relay-handoff.md    # Session continuity (committed)
+```
+
+---
+
+## Documentation Standards
+
+### Timestamps
+Always use: `Month DD, YYYY, H:MM AM/PM CST`
+Example: `January 10, 2026, 1:45 PM CST`
+
+Update BOTH when editing documents:
+1. Header: `**Date:** January 10, 2026, 1:45 PM CST`
+2. Footer: `**Last Updated:** January 10, 2026, 1:45 PM CST`
+
+### Status Indicators
+- ✅ Complete — Done, tested, documented
+- 🚧 In Progress — Actively working
+- ⏳ Pending — Not started
+- ⚠️ Blocked — Can't proceed
+- ❌ Cancelled — No longer needed
+
+### Keep Plans Updated
+Update `/plans/*.md` documents:
+- After completing tasks
+- When approach changes
+- At end of each session
+- Never wait until "everything is done"
+
+---
+
+## Git Workflow
+
+### Commit Format
+```
+<type>: <description>
+
+Types: feat, fix, docs, test, refactor, chore
+```
+
+### What to Commit
+- ✅ Source code, tests, documentation
+- ✅ Lock files (requirements.txt, package-lock.json)
+- ✅ `/working_sessions/relay-handoff.md`
+- ❌ Daily session notes (YYYY-MM-DD folders)
+- ❌ `.env` files
+- ❌ `__pycache__`, `node_modules`
+
+---
+
+## Session Workflow
+
+### Starting Session
+1. Read `/working_sessions/relay-handoff.md` (if exists)
+2. Check `IMPLEMENTATION_STATUS.md` for current phase
+3. Review plan documents for latest updates
+4. Ask user for priorities
+
+### During Session
+1. Update plans frequently (don't wait)
+2. Test continuously (pytest after changes)
+3. Take notes in `/working_sessions/YYYY-MM-DD/`
+4. Update timestamps on modified docs
+5. Ask for clarification when unsure
+
+### Ending Session
+1. Update all relevant plans
+2. Run final test suite
+3. Create relay handoff if requested
+4. Commit working code
+5. Document any blockers
+
+---
+
+## Security Standards
+
+### API
+- Rate limiting on all endpoints
+- Pydantic validation for inputs
+- JWT validation for protected routes
+- CORS restricted to frontend domain
+
+### Database
+- RLS policies enabled on all tables
+- Service role key only in backend
+- Parameterized queries (SQLAlchemy handles)
+- Hash sensitive fields
+
+### Environment
+- Never commit `.env`
+- Validate all env vars at startup
+- Use `.env.example` as template
+
+---
+
+## Key Documents
+
+Quick reference:
+- `QUICK_START.md` — Immediate next steps
+- `IMPLEMENTATION_STATUS.md` — Current progress
+- `plans/00_MASTER_PLAN.md` — Full roadmap
+- `PROJECT_CONVENTIONS.md` — Detailed standards
+- `database/schema/DATABASE_SCHEMA.md` — Complete schema
+
+---
+
+## Vita Personality (Telegram Bot)
+
+When implementing Vita agent:
+- Calm, present, intelligent, warm
+- Short sentences, natural rhythm
+- Never preachy, never alarmist
+- Max 1-2 nudges per day
+- Silence is respected
+- See: `/design_docs/11_vita_personality_and_voice.md`
+
+---
+
+## Common Patterns
+
+### Service Layer
+```python
+# All business logic in services
+class RoutineService:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+    
+    async def get_active_items(
+        self, 
+        user_id: UUID, 
+        moment: MomentOfDay
+    ) -> List[RoutineItem]:
+        """Get active routine items for user at specific moment.
+        
+        Handles version and expiration logic internally.
+        See: /database/schema/DATABASE_SCHEMA.md#active_routine_items_view
+        """
+        # Implementation...
+```
+
+### API Endpoints
+```python
+@router.get("/routines", response_model=List[RoutineSchema])
+async def get_routines(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all routines for current user.
+    
+    Returns:
+        List of routine objects with active items
+    """
+    service = RoutineService(db)
+    return await service.get_user_routines(current_user.id)
+```
+
+---
+
+## Testing Patterns
+
+### Service Tests
+```python
+@pytest.mark.asyncio
+async def test_get_active_routines(db_session, test_user):
+    """Test retrieving active routines for user."""
+    service = RoutineService(db_session)
+    routines = await service.get_active_routines(test_user.id)
+    
+    assert len(routines) > 0
+    assert all(r.user_id == test_user.id for r in routines)
+```
+
+### Coverage Targets
+- Core logic (services, agents): 80%+
+- API endpoints: 70%+
+- Utilities: 90%+
+
+---
+
+## Decision Making
+
+### When to Block (Ask User)
+- User input required (HITL points)
+- Multiple valid approaches (architectural impact)
+- Security/data integrity concerns
+- Unclear requirements
+
+### When to Assume (Document)
+- Standard industry practice
+- Default configuration reasonable
+- Choice easily reversible
+- User gave general guidance
+
+Always document:
+```python
+# ASSUMPTION: Using UTC for all timestamps, display in CST
+# User can override with TIMEZONE env var
+```
+
+---
+
+## Performance Standards
+
+- Simple API queries: < 100ms
+- Complex queries: < 500ms
+- LangGraph workflows: < 5s (acceptable)
+- Index all foreign keys
+- Use database views for complex joins
+
+---
+
+## Remember
+
+1. Explain WHY, not just WHAT
+2. Link to official docs
+3. Type hints everywhere
+4. Test continuously
+5. Update plans frequently
+6. Ask when unsure
+7. Teaching mode always on
+8. SQLAlchemy (not raw SQL)
+9. Rules before AI
+10. User is learning Python
+
+**See `PROJECT_CONVENTIONS.md` and `BEST_PRACTICES.md` for full details.**
