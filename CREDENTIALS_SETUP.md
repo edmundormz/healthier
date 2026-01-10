@@ -29,14 +29,15 @@
 
 **Copy these 3 values:**
 - **Project URL** (looks like: `https://xxxxx.supabase.co`)
-- **anon/public key** (starts with `eyJ...`)
-- **service_role key** (starts with `eyJ...`)
+- **Publishable key** (new system, starts with `sb_publishable_...`)
+- **Secret key** (new system, backend only - you'll need to get this from Supabase team settings)
 
 **⚠️ Important:**
-- The `service_role` key has full database access
+- The `secret` key has full database access (like old service_role key)
 - NEVER expose it in frontend code
 - NEVER commit it to git
 - Only use it in backend (Render environment variables)
+- The `publishable` key is safe to use in frontend (replaces old anon key)
 
 ---
 

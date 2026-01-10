@@ -33,47 +33,51 @@ backend/
 
 ## Setup
 
-### 1. Create Virtual Environment
+### 1. Install Poetry
+
+Poetry is a modern Python dependency manager (better than pip).
 
 ```bash
-# Windows
-python -m venv venv
-.\venv\Scripts\activate
+# Windows (PowerShell)
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
 
 # Mac/Linux
-python3 -m venv venv
-source venv/bin/activate
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Verify installation
+poetry --version
 ```
 
 ### 2. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+# Install all dependencies
+poetry install
+
+# This creates a virtual environment automatically
+# Poetry manages it for you!
 ```
 
 ### 3. Configure Environment
 
-Copy `.env.example` to `.env` and fill in your credentials:
+Your `.env` file should have these values:
 
-```bash
-cp .env.example .env
-```
-
-Required environment variables:
+Required environment variables (new Supabase key system):
 - `SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_ANON_KEY` - Supabase anon/public key
-- `SUPABASE_SERVICE_KEY` - Supabase service role key (⚠️ keep secret!)
+- `SUPABASE_PUBLISHABLE_KEY` - New publishable key (replaces anon key)
+- `SUPABASE_SECRET_KEY` - Secret key (replaces service_role key, ⚠️ keep secret!)
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token from @BotFather
 - `OPENAI_API_KEY` - OpenAI API key for LangGraph
 
 ### 4. Run the API
 
 ```bash
-# Development mode (auto-reload on code changes)
-uvicorn app.main:app --reload
+# With Poetry (recommended)
+poetry run uvicorn app.main:app --reload
 
-# Or using Python
-python -m app.main
+# Or enter Poetry shell first
+poetry shell
+uvicorn app.main:app --reload
 ```
 
 API will be available at:
@@ -86,30 +90,33 @@ API will be available at:
 ### Run Tests
 
 ```bash
-# Run all tests
-pytest
+# Run all tests (with Poetry)
+poetry run pytest
 
 # Run with coverage report
-pytest --cov=app --cov-report=html
+poetry run pytest --cov=app --cov-report=html
 
 # Run only unit tests
-pytest -m unit
+poetry run pytest -m unit
 
 # Run specific test file
-pytest tests/test_example.py
+poetry run pytest tests/test_example.py
 ```
 
 ### Code Quality
 
 ```bash
 # Format code (Black)
-black app/ tests/
+poetry run black app/ tests/
 
 # Lint code (Ruff)
-ruff check app/ tests/
+poetry run ruff check app/ tests/
 
 # Type check (MyPy)
-mypy app/
+poetry run mypy app/
+
+# Auto-fix linting issues
+poetry run ruff check --fix app/ tests/
 ```
 
 ### Database Migrations

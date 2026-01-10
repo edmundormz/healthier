@@ -1,0 +1,110 @@
+[tool.poetry]
+name = "ch-health-backend"
+version = "0.1.0"
+description = "CH Health OS - Backend API"
+authors = ["CH Health Team"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# FastAPI and Server
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+python-multipart = "^0.0.6"
+
+# Pydantic for validation
+pydantic = "^2.5.3"
+pydantic-settings = "^2.1.0"
+
+# Database - SQLAlchemy + Async
+sqlalchemy = "^2.0.25"
+asyncpg = "^0.29.0"
+alembic = "^1.13.1"
+
+# Supabase
+supabase = "^2.3.4"
+postgrest = "^0.13.2"
+
+# LangGraph and LangChain
+langgraph = "^0.2.28"
+langchain = "^0.1.20"
+langchain-openai = "^0.0.8"
+langchain-core = "^0.1.52"
+
+# Telegram Bot
+python-telegram-bot = "^20.7"
+
+# HTTP Client
+httpx = "^0.26.0"
+
+# Utilities
+python-dotenv = "^1.0.0"
+pytz = "^2024.1"
+
+# Security and Auth
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+bcrypt = "^4.1.2"
+
+# Logging
+structlog = "^24.1.0"
+
+[tool.poetry.group.dev.dependencies]
+# Testing
+pytest = "^7.4.4"
+pytest-asyncio = "^0.21.1"
+pytest-cov = "^4.1.0"
+
+# Code Quality
+ruff = "^0.1.15"
+mypy = "^1.8.0"
+black = "^24.1.1"
+
+# Type stubs
+types-pytz = "^2024.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_generics = false
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=app --cov-report=term-missing --cov-report=html"
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
