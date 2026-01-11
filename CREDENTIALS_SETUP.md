@@ -27,17 +27,19 @@
 2. Open your "healthier" project
 3. Go to: **Settings** > **API**
 
-**Copy these 3 values:**
-- **Project URL** (looks like: `https://xxxxx.supabase.co`)
-- **Publishable key** (new system, starts with `sb_publishable_...`)
-- **Secret key** (new system, backend only - you'll need to get this from Supabase team settings)
+**Copy these values:**
+- **Project URL** (looks like: `https://xxxxx.supabase.co`) - ✅ Already in `.env`
+- **Publishable key** (starts with `sb_publishable_...`) - ✅ Already in `.env`
+- **Secret key** (starts with `sb_secret_...`) - ⚠️ You need to add this
 
 **⚠️ Important:**
-- The `secret` key has full database access (like old service_role key)
+- The `secret` key has elevated privileges for backend operations
 - NEVER expose it in frontend code
 - NEVER commit it to git
 - Only use it in backend (Render environment variables)
-- The `publishable` key is safe to use in frontend (replaces old anon key)
+- The `publishable` key is safe to use in frontend
+
+**Note:** The old `anon` and `service_role` keys are deprecated. Supabase now uses publishable/secret keys.
 
 ---
 
@@ -48,10 +50,10 @@
 Create `backend/.env` file manually with:
 
 ```bash
-# Supabase Configuration
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=your_anon_key_here
-SUPABASE_SERVICE_KEY=your_service_role_key_here
+# Supabase Configuration (New Key System)
+SUPABASE_URL=https://ekttjvqjkvvpavewsxhb.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_i4s7XifpKe1WVj9nAi55wg_KQ60frnZ
+SUPABASE_SECRET_KEY=your_secret_key_here
 
 # Telegram Bot - Vita
 TELEGRAM_BOT_TOKEN=8533710273:AAEKPctRqKNTkpuu3pJY7mawLxhT3SqE2V8
@@ -82,10 +84,8 @@ LOG_LEVEL=INFO
 ```
 
 **Replace these values:**
-- `SUPABASE_URL` — Your Supabase project URL
-- `SUPABASE_ANON_KEY` — Your anon/public key
-- `SUPABASE_SERVICE_KEY` — Your service role key
-- `OPENAI_API_KEY` — Your OpenAI API key
+- `SUPABASE_SECRET_KEY` — Your secret key (get from dashboard)
+- `OPENAI_API_KEY` — Your OpenAI API key (for later)
 
 ---
 
@@ -110,7 +110,8 @@ When deploying to Render, add these as **Environment Variables**:
 
 - [ ] `.env` file is in `.gitignore` ✅ (already configured)
 - [ ] Never commit `.env` to git
-- [ ] Service role key only used in backend
+- [ ] Secret key only used in backend (never in frontend)
+- [ ] Publishable key is safe for frontend use
 - [ ] Production `SECRET_KEY` is random and secure
 - [ ] Webhook secret is random and secure
 - [ ] OpenAI API key has usage limits set
@@ -122,9 +123,9 @@ When deploying to Render, add these as **Environment Variables**:
 | Credential | Status | Location |
 |------------|--------|----------|
 | Telegram Bot Token | ✅ Configured | `backend/.env` |
-| Supabase URL | ⏳ Pending | Need from dashboard |
-| Supabase Anon Key | ⏳ Pending | Need from dashboard |
-| Supabase Service Key | ⏳ Pending | Need from dashboard |
+| Supabase URL | ✅ Configured | `backend/.env` |
+| Supabase Publishable Key | ✅ Configured | `backend/.env` |
+| Supabase Secret Key | ⏳ Pending | Need from dashboard |
 | OpenAI API Key | ⏳ Pending | User to provide |
 
 ---

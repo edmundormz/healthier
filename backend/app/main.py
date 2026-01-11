@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
 from app.core.config import settings
+from app.core.database import test_connection, close_db
 
 # Initialize structured logging
 # This provides JSON-formatted logs that are easier to parse and analyze
@@ -40,6 +41,13 @@ async def lifespan(app: FastAPI):
         debug=settings.DEBUG,
     )
     
+    # Test database connection
+    db_connected = await test_connection()
+    if db_connected:
+        logger.info("database_connected", status="success")
+    else:
+        logger.warning("database_connection_failed", status="warning")
+    
     yield  # Application runs here
     
     # Shutdown code (runs when app stops)
@@ -47,6 +55,7 @@ async def lifespan(app: FastAPI):
     # - Close database connections
     # - Cleanup resources
     # - Save state if needed
+    await close_db()
     logger.info("application_shutdown")
 
 
@@ -103,9 +112,15 @@ async def health_check():
     Returns:
         dict: Service health status
     """
+    from app.core.database import test_connection
+    
+    # Test database connection
+    db_connected = await test_connection()
+    
     return {
-        "status": "ok",
+        "status": "ok" if db_connected else "degraded",
         "environment": settings.ENVIRONMENT,
+        "database": "connected" if db_connected else "disconnected",
     }
 
 

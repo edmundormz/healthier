@@ -29,9 +29,9 @@ class Settings(BaseSettings):
     # Supabase Configuration
     # New key system (publishable + secret keys)
     # See: https://supabase.com/docs/guides/api/api-keys
-    SUPABASE_URL: str
-    SUPABASE_PUBLISHABLE_KEY: str  # Replaces anon key (safe for frontend)
-    SUPABASE_SECRET_KEY: str  # Replaces service_role key (backend only)
+    SUPABASE_URL: str  # Project URL (e.g., https://xxx.supabase.co)
+    SUPABASE_PUBLISHABLE_KEY: str  # Public key, safe for frontend
+    SUPABASE_SECRET_KEY: str  # Secret key, backend only (elevated privileges)
 
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str
