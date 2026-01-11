@@ -5,6 +5,7 @@ This is the entry point for the CH Health OS API.
 It sets up the FastAPI app, middleware, and routes.
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
@@ -16,7 +17,40 @@ from app.core.config import settings
 # See: https://www.structlog.org/
 logger = structlog.get_logger()
 
-# Create FastAPI application
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan event handler for FastAPI application.
+    
+    This replaces the deprecated @app.on_event() decorators.
+    Code before 'yield' runs on startup, code after runs on shutdown.
+    
+    See: https://fastapi.tiangolo.com/advanced/events/#lifespan-events
+    """
+    # Startup code (runs when app starts)
+    # Good place to:
+    # - Initialize database connections
+    # - Set up connection pools
+    # - Load ML models
+    # - Verify environment variables
+    logger.info(
+        "application_startup",
+        environment=settings.ENVIRONMENT,
+        debug=settings.DEBUG,
+    )
+    
+    yield  # Application runs here
+    
+    # Shutdown code (runs when app stops)
+    # Good place to:
+    # - Close database connections
+    # - Cleanup resources
+    # - Save state if needed
+    logger.info("application_shutdown")
+
+
+# Create FastAPI application with lifespan handler
 # OpenAPI docs will be available at /docs (Swagger UI) and /redoc (ReDoc)
 app = FastAPI(
     title=settings.API_TITLE,
@@ -24,6 +58,7 @@ app = FastAPI(
     version=settings.API_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,  # Use new lifespan handler instead of deprecated on_event
 )
 
 # CORS (Cross-Origin Resource Sharing) Configuration
@@ -37,37 +72,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allows all headers
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    """
-    Runs when the application starts up.
-    
-    Good place to:
-    - Initialize database connections
-    - Set up connection pools
-    - Load ML models
-    - Verify environment variables
-    """
-    logger.info(
-        "application_startup",
-        environment=settings.ENVIRONMENT,
-        debug=settings.DEBUG,
-    )
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """
-    Runs when the application shuts down.
-    
-    Good place to:
-    - Close database connections
-    - Cleanup resources
-    - Save state if needed
-    """
-    logger.info("application_shutdown")
 
 
 @app.get("/")
