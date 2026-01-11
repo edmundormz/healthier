@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
 from app.core.config import settings
-from app.core.database import test_connection, close_db
+from app.core.database import test_connection, close_db, init_db
 
 # Initialize structured logging
 # This provides JSON-formatted logs that are easier to parse and analyze
@@ -39,12 +39,16 @@ async def lifespan(app: FastAPI):
         "application_startup",
         environment=settings.ENVIRONMENT,
         debug=settings.DEBUG,
+        database="SQLAlchemy + asyncpg + Supabase Postgres"
     )
+    
+    # Initialize database
+    await init_db()
     
     # Test database connection
     db_connected = await test_connection()
     if db_connected:
-        logger.info("database_connected", status="success")
+        logger.info("database_connected", status="success", orm="SQLAlchemy 2.0")
     else:
         logger.warning("database_connection_failed", status="warning")
     
@@ -124,8 +128,47 @@ async def health_check():
     }
 
 
+# =============================================================================
+# Test Endpoints (Development Only)
+# =============================================================================
+
+from sqlalchemy import select
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
+from app.models import User
+
+
+@app.get("/api/test/users")
+async def test_list_users(db: AsyncSession = Depends(get_db)):
+    """
+    Test endpoint - List all users.
+    
+    This demonstrates:
+    - Database connection working
+    - SQLAlchemy ORM working
+    - Dependency injection working
+    """
+    stmt = select(User).limit(10)
+    result = await db.execute(stmt)
+    users = result.scalars().all()
+    
+    return {
+        "status": "success",
+        "orm": "SQLAlchemy 2.0",
+        "count": len(users),
+        "users": [
+            {
+                "id": str(user.id),
+                "email": user.email,
+                "full_name": user.full_name,
+            }
+            for user in users
+        ]
+    }
+
+
 # Future route imports will go here
-# Example:
 # from app.api.routes import routines, habits, telegram
 # app.include_router(routines.router, prefix="/api/routines", tags=["routines"])
 # app.include_router(habits.router, prefix="/api/habits", tags=["habits"])

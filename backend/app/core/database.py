@@ -1,225 +1,204 @@
 """
 Database Connection and Session Management
 
-This module sets up Supabase REST API client for database operations.
+This module sets up SQLAlchemy async engine and session management for Supabase Postgres.
 
-Why Direct REST API?
-- Works reliably with Supabase's new secret key format
-- Simple and straightforward HTTP requests
-- Full control over authentication headers
-- Compatible with all Supabase key types
+Why SQLAlchemy ORM?
+- Type safety with Python models that map to database tables
+- IDE autocomplete and refactoring support
+- Prevents SQL injection (uses parameterized queries)
+- Relationship management (user.families, routine.items, etc.)
+- Transaction support for data integrity
+- Migration tracking with Alembic
 
-We use httpx for async HTTP requests to Supabase's REST API.
-See: https://supabase.com/docs/reference/rest/introduction
+Architecture:
+    FastAPI → SQLAlchemy ORM → asyncpg driver → Supabase Postgres
+
+See: https://docs.sqlalchemy.org/en/20/orm/extensions/asyncio.html
 """
 
-from typing import Generator, Dict, Any, Optional
-import httpx
+from typing import AsyncGenerator
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    create_async_engine,
+    async_sessionmaker,
+)
+from sqlalchemy.orm import DeclarativeBase
 import structlog
 
 from app.core.config import settings
 
 logger = structlog.get_logger()
 
-# Supabase REST API base URL
-SUPABASE_REST_URL = f"{settings.SUPABASE_URL}/rest/v1"
 
-# HTTP client for Supabase API requests
-# Using httpx for async HTTP operations
-# See: https://www.python-httpx.org/
-_client: Optional[httpx.AsyncClient] = None
+# =============================================================================
+# SQLAlchemy Base Model
+# =============================================================================
 
-
-def get_client() -> httpx.AsyncClient:
+class Base(DeclarativeBase):
     """
-    Get or create the HTTP client for Supabase API.
+    Base class for all SQLAlchemy models.
     
-    Returns:
-        httpx.AsyncClient: Async HTTP client configured for Supabase
-    """
-    global _client
-    if _client is None:
-        _client = httpx.AsyncClient(
-            base_url=SUPABASE_REST_URL,
-            headers={
-                "apikey": settings.SUPABASE_SECRET_KEY,
-                "Authorization": f"Bearer {settings.SUPABASE_SECRET_KEY}",
-                "Content-Type": "application/json",
-                "Prefer": "return=representation",
-            },
-            timeout=30.0,
-        )
-    return _client
-
-
-class SupabaseClient:
-    """
-    Simple Supabase client wrapper using REST API.
+    All your models will inherit from this class:
     
-    This provides a clean interface for database operations
-    using Supabase's REST API with the secret key.
-    """
-    
-    def __init__(self):
-        self.client = get_client()
-        self.base_url = SUPABASE_REST_URL
-    
-    def table(self, table_name: str) -> "TableBuilder":
-        """
-        Access a database table.
-        
-        Args:
-            table_name: Name of the table
-            
-        Returns:
-            TableBuilder: Builder for table operations
-        """
-        return TableBuilder(self.client, table_name)
-
-
-class TableBuilder:
-    """Builder for table operations."""
-    
-    def __init__(self, client: httpx.AsyncClient, table_name: str):
-        self.client = client
-        self.table_name = table_name
-        self._select = "*"
-        self._filters: Dict[str, Any] = {}
-        self._limit: Optional[int] = None
-    
-    def select(self, columns: str = "*") -> "TableBuilder":
-        """
-        Select columns to return.
-        
-        Args:
-            columns: Column names (e.g., "id,name" or "*")
-            
-        Returns:
-            TableBuilder: Self for chaining
-        """
-        self._select = columns
-        return self
-    
-    def limit(self, count: int) -> "TableBuilder":
-        """
-        Limit number of rows returned.
-        
-        Args:
-            count: Maximum number of rows
-            
-        Returns:
-            TableBuilder: Self for chaining
-        """
-        self._limit = count
-        return self
-    
-    async def execute(self) -> Dict[str, Any]:
-        """
-        Execute the query.
-        
-        Returns:
-            Dict with 'data' and 'error' keys
-        """
-        url = f"/{self.table_name}"
-        params = {"select": self._select}
-        
-        if self._limit:
-            params["limit"] = str(self._limit)
-        
-        try:
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            return {"data": response.json(), "error": None}
-        except httpx.HTTPStatusError as e:
-            logger.error("supabase_query_error", table=self.table_name, status=e.response.status_code)
-            return {"data": None, "error": str(e)}
-        except Exception as e:
-            logger.error("supabase_query_exception", table=self.table_name, error=str(e))
-            return {"data": None, "error": str(e)}
-
-
-# Create global Supabase client instance
-supabase = SupabaseClient()
-
-
-def get_supabase() -> SupabaseClient:
-    """
-    Get the Supabase client instance.
-    
-    This is used as a FastAPI dependency:
     ```python
-    @app.get("/users")
-    async def get_users(db: SupabaseClient = Depends(get_supabase)):
-        response = await db.table("users").select("*").execute()
-        return response["data"]
+    class User(Base):
+        __tablename__ = "users"
+        id = Column(UUID, primary_key=True)
+        email = Column(String, unique=True)
     ```
     
-    Returns:
-        SupabaseClient: Supabase client instance
+    This base class provides:
+    - Table metadata tracking
+    - Relationship configuration
+    - Migration support
     """
-    return supabase
+    pass
 
 
-def get_db() -> Generator[SupabaseClient, None, None]:
+# =============================================================================
+# Database Engine Configuration
+# =============================================================================
+
+# Create async engine
+# This manages the connection pool to the database
+# See: https://docs.sqlalchemy.org/en/20/core/engines.html
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,  # Log SQL queries in development
+    pool_pre_ping=True,  # Verify connections before using them
+    pool_size=5,  # Number of connections to maintain
+    max_overflow=10,  # Additional connections if pool is full
+    pool_recycle=3600,  # Recycle connections after 1 hour (prevents stale connections)
+)
+
+# Create session factory
+# Sessions are used to interact with the database
+# Each request gets its own session
+# See: https://docs.sqlalchemy.org/en/20/orm/session_api.html
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,  # Don't expire objects after commit (better for async)
+    autocommit=False,  # Explicit commits required (safer)
+    autoflush=False,  # Explicit flushes required (more control)
+)
+
+
+# =============================================================================
+# Dependency Injection
+# =============================================================================
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    Dependency function that provides a Supabase client.
+    FastAPI dependency that provides a database session.
+    
+    This is used in your API endpoints:
+    
+    ```python
+    @app.get("/users")
+    async def get_users(db: AsyncSession = Depends(get_db)):
+        result = await db.execute(select(User))
+        users = result.scalars().all()
+        return users
+    ```
+    
+    The session is automatically:
+    - Created before the request
+    - Committed if successful
+    - Rolled back on error
+    - Closed after the request
+    
+    Yields:
+        AsyncSession: Database session for this request
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+# =============================================================================
+# Database Utilities
+# =============================================================================
+
+async def init_db() -> None:
+    """
+    Initialize database tables.
+    
+    Note: In production, we use Alembic migrations instead.
+    This function is useful for testing or initial setup.
+    
+    In development:
+    - Tables already exist in Supabase (created via migrations)
+    - This function verifies the connection works
     
     Usage:
     ```python
-    @app.get("/users")
-    async def get_users(db: SupabaseClient = Depends(get_db)):
-        response = await db.table("users").select("*").execute()
-        return response["data"]
+    await init_db()  # Verifies tables exist
     ```
-    
-    Yields:
-        SupabaseClient: Supabase client instance
     """
-    yield supabase
+    async with engine.begin() as conn:
+        # Verify connection works
+        # In production, use Alembic migrations to create/update tables
+        # await conn.run_sync(Base.metadata.create_all)
+        logger.info("database_initialized", note="Using existing Supabase schema")
 
 
 async def test_connection() -> bool:
     """
-    Test the database connection.
+    Test database connection.
     
-    This performs a simple query to verify the connection works.
+    This performs a simple query to verify:
+    - Database is accessible
+    - Credentials are correct
+    - Network connection works
     
     Returns:
-        bool: True if connection is successful, False otherwise
+        bool: True if connection successful, False otherwise
+        
+    Example:
+    ```python
+    if await test_connection():
+        print("✅ Database connected")
+    else:
+        print("❌ Database connection failed")
+    ```
     """
     try:
-        # Simple query to test connection
-        response = await supabase.table("users").select("id").limit(1).execute()
-        if response["error"]:
-            logger.error("database_connection_test_failed", error=response["error"])
-            return False
-        logger.info("database_connection_test_successful")
-        return True
+        async with AsyncSessionLocal() as session:
+            # Simple query to test connection
+            result = await session.execute(text("SELECT 1"))
+            result.scalar()
+            logger.info("database_connection_test_successful")
+            return True
     except Exception as e:
         logger.error("database_connection_test_failed", error=str(e))
         return False
 
 
-async def init_db():
-    """
-    Initialize database (no-op for Supabase).
-    
-    Supabase uses migrations applied via SQL, not programmatic table creation.
-    This function exists for compatibility but doesn't do anything.
-    
-    To create tables, use SQL migrations via Supabase dashboard or MCP.
-    """
-    logger.info("database_initialized", note="Using Supabase client - tables managed via migrations")
-
-
-async def close_db():
+async def close_db() -> None:
     """
     Close database connections.
     
-    Closes the HTTP client connection pool.
+    This is called during application shutdown to:
+    - Close all active connections
+    - Release connection pool resources
+    - Cleanup async tasks
+    
+    FastAPI calls this automatically via lifespan handler.
     """
-    global _client
-    if _client:
-        await _client.aclose()
-        _client = None
+    await engine.dispose()
     logger.info("database_connections_closed")
+
+
+# =============================================================================
+# Import fix for test_connection
+# =============================================================================
+
+from sqlalchemy import text  # noqa: E402

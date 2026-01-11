@@ -21,45 +21,60 @@ Supabase now uses **publishable** and **secret** keys (the old anon/service_role
 # =============================================================================
 # SUPABASE CONFIGURATION
 # =============================================================================
-# Get from: https://supabase.com/dashboard/project/ekttjvqjkvvpavewsxhb/settings/api
-
-# Project URL (already filled in)
 SUPABASE_URL=https://ekttjvqjkvvpavewsxhb.supabase.co
-
-# Publishable key (safe for frontend, already filled in)
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_i4s7XifpKe1WVj9nAi55wg_KQ60frnZ
-
-# Secret key (SECRET - backend only)
-# ⚠️ TODO: Get from dashboard -> Settings -> API -> "secret" key
 SUPABASE_SECRET_KEY=your_secret_key_here
 
-# Telegram Bot - Vita
+# =============================================================================
+# DATABASE CONFIGURATION (SQLAlchemy)
+# =============================================================================
+# Connection pooling (use for application runtime - pgbouncer transaction mode)
+DATABASE_URL=postgresql+asyncpg://postgres.ekttjvqjkvvpavewsxhb:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true
+
+# Direct connection (use for migrations - bypasses pgbouncer)
+DIRECT_URL=postgresql+asyncpg://postgres.ekttjvqjkvvpavewsxhb:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+
+# =============================================================================
+# TELEGRAM BOT - VITA
+# =============================================================================
 TELEGRAM_BOT_TOKEN=8533710273:AAEKPctRqKNTkpuu3pJY7mawLxhT3SqE2V8
 TELEGRAM_WEBHOOK_SECRET=ch_health_vita_webhook_secret_2026
 
-# OpenAI (for LangGraph/Vita)
+# =============================================================================
+# OPENAI (for LangGraph/Vita)
+# =============================================================================
 OPENAI_API_KEY=your_openai_api_key_here
 
-# Application Settings
+# =============================================================================
+# APPLICATION SETTINGS
+# =============================================================================
 ENVIRONMENT=development
 DEBUG=true
 TIMEZONE=America/Chicago
 
-# API Configuration
+# =============================================================================
+# API CONFIGURATION
+# =============================================================================
 API_HOST=0.0.0.0
 API_PORT=8000
 API_TITLE=CH Health OS API
 API_VERSION=0.1.0
 
+# =============================================================================
 # CORS (comma-separated origins)
+# =============================================================================
 CORS_ORIGINS=http://localhost:3000,http://localhost:8000
 
-# Security
+# =============================================================================
+# SECURITY
+# =============================================================================
 SECRET_KEY=ch_health_dev_secret_key_change_in_production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# Logging
+# =============================================================================
+# LOGGING
+# =============================================================================
 LOG_LEVEL=INFO
 ```
 
@@ -71,8 +86,12 @@ LOG_LEVEL=INFO
 
 ## Keys You Need to Add
 
-⏳ **SUPABASE_SECRET_KEY** - Get from Supabase dashboard  
+⏳ **SUPABASE_SECRET_KEY** - Get from Supabase dashboard (optional, for Supabase Auth/Storage)
+⚠️ **DATABASE_URL** - Replace YOUR_PASSWORD with your database password  
+⚠️ **DIRECT_URL** - Replace YOUR_PASSWORD with your database password  
 ⏳ **OPENAI_API_KEY** - Get from OpenAI platform (for Vita agent)
+
+**Note**: The backend now uses **direct Postgres connection** (DATABASE_URL) via SQLAlchemy, not the Supabase REST API. The SUPABASE_SECRET_KEY is only needed if you want to use Supabase Auth or Storage features.
 
 ## About Supabase Keys
 

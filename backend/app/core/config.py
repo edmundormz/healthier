@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     Pydantic will validate types and required fields automatically.
     """
 
+    # Database Configuration (SQLAlchemy)
+    # See: https://docs.sqlalchemy.org/en/20/core/engines.html
+    DATABASE_URL: str  # Pooled connection for app runtime
+    DIRECT_URL: str  # Direct connection for migrations
+
     # Supabase Configuration
     # New key system (publishable + secret keys)
     # See: https://supabase.com/docs/guides/api/api-keys
@@ -117,6 +122,13 @@ def validate_settings():
     # Validate Supabase URL format
     if not settings.SUPABASE_URL.startswith("https://"):
         raise ValueError("SUPABASE_URL must start with https://")
+    
+    # Validate database URLs
+    if not settings.DATABASE_URL.startswith("postgresql"):
+        raise ValueError("DATABASE_URL must be a valid PostgreSQL connection string")
+    
+    if not settings.DIRECT_URL.startswith("postgresql"):
+        raise ValueError("DIRECT_URL must be a valid PostgreSQL connection string")
 
 
 # Run validation on import
