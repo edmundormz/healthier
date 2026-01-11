@@ -168,11 +168,34 @@ async def test_list_users(db: AsyncSession = Depends(get_db)):
     }
 
 
-# Future route imports will go here
-# from app.api.routes import routines, habits, telegram
-# app.include_router(routines.router, prefix="/api/routines", tags=["routines"])
-# app.include_router(habits.router, prefix="/api/habits", tags=["habits"])
-# app.include_router(telegram.router, prefix="/api/telegram", tags=["telegram"])
+# =============================================================================
+# API Routes
+# =============================================================================
+
+# Import and register API routers
+# If there's an import error, it will be caught here
+try:
+    from app.api.routes import users, routines, habits
+    
+    # Register all API routers
+    # Each router has its own prefix, so we add /api here
+    # Final paths will be: /api/users/*, /api/routines/*, /api/habits/*
+    app.include_router(users.router, prefix="/api")
+    app.include_router(routines.router, prefix="/api")
+    app.include_router(habits.router, prefix="/api")
+    
+    logger.info("api_routes_loaded", users=True, routines=True, habits=True)
+    print("✅ API routes loaded successfully!")
+    print(f"   - Users router: {len(users.router.routes)} routes")
+    print(f"   - Routines router: {len(routines.router.routes)} routes")
+    print(f"   - Habits router: {len(habits.router.routes)} routes")
+except Exception as e:
+    logger.error("api_routes_import_error", error=str(e), exc_info=True)
+    print(f"❌ ERROR loading API routes: {e}")
+    import traceback
+    traceback.print_exc()
+    # Re-raise to fail startup so we can see the error
+    raise
 
 
 if __name__ == "__main__":

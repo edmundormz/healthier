@@ -63,6 +63,11 @@ class Base(DeclarativeBase):
 # Create async engine
 # This manages the connection pool to the database
 # See: https://docs.sqlalchemy.org/en/20/core/engines.html
+#
+# IMPORTANT: Disable prepared statements for pgbouncer compatibility
+# pgbouncer in "transaction" or "statement" mode doesn't support prepared statements
+# Setting statement_cache_size=0 disables prepared statements in asyncpg
+# See: https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#asyncpg
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,  # Log SQL queries in development
@@ -70,6 +75,9 @@ engine = create_async_engine(
     pool_size=5,  # Number of connections to maintain
     max_overflow=10,  # Additional connections if pool is full
     pool_recycle=3600,  # Recycle connections after 1 hour (prevents stale connections)
+    connect_args={
+        "statement_cache_size": 0,  # Disable prepared statements for pgbouncer compatibility
+    },
 )
 
 # Create session factory
