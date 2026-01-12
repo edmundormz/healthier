@@ -1,15 +1,19 @@
 # FastAPI and Server
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+# Updated for Python 3.13 compatibility
+fastapi==0.115.0
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
 
 # Pydantic for validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
+# Updated to 2.10+ for Python 3.13 compatibility (pre-built wheels)
+pydantic==2.10.6
+pydantic-settings==2.7.1
 
 # Database - SQLAlchemy + Async
-sqlalchemy==2.0.25
-asyncpg==0.29.0
+# Note: 2.0.36+ required for Python 3.13 compatibility
+# asyncpg 0.30.0+ has pre-built wheels for Python 3.13
+sqlalchemy==2.0.36
+asyncpg==0.30.0
 alembic==1.13.1
 
 # Supabase
@@ -17,16 +21,19 @@ supabase==2.3.4
 postgrest==0.13.2
 
 # LangGraph and LangChain
-langgraph==0.2.28
-langchain==0.1.20
-langchain-openai==0.0.8
-langchain-core==0.1.52
+# Updated for Python 3.13 compatibility
+# Using compatible versions (let pip resolve)
+langgraph>=0.2.62
+langchain>=0.3.18
+langchain-openai>=1.1.7
+langchain-core>=0.3.34
 
 # Telegram Bot
 python-telegram-bot==20.7
 
 # HTTP Client
-httpx==0.26.0
+# Keep at 0.25.x for compatibility with supabase 2.3.4
+httpx==0.25.2
 
 # Utilities
 python-dotenv==1.0.0
@@ -39,16 +46,17 @@ bcrypt==4.1.2
 
 # Logging
 structlog==24.1.0
+email-validator==2.3.0
 
 # Testing
-pytest==7.4.4
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
+pytest==8.3.4
+pytest-asyncio==0.25.2
+pytest-cov==6.0.0
 
 # Code Quality
-ruff==0.1.15
-mypy==1.8.0
-black==24.1.1
+ruff==0.9.2
+mypy==1.14.1
+black==24.10.0
 
 # Type stubs
 types-pytz==2024.1.0.20240203

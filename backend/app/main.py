@@ -187,14 +187,14 @@ try:
     app.include_router(habits.router, prefix="/api")
     
     logger.info("api_routes_loaded", auth=True, users=True, routines=True, habits=True)
-    print("✅ API routes loaded successfully!")
+    print("[SUCCESS] API routes loaded successfully!")
     print(f"   - Auth router: {len(auth.router.routes)} routes (Supabase Auth on frontend)")
     print(f"   - Users router: {len(users.router.routes)} routes")
     print(f"   - Routines router: {len(routines.router.routes)} routes")
     print(f"   - Habits router: {len(habits.router.routes)} routes")
 except Exception as e:
     logger.error("api_routes_import_error", error=str(e), exc_info=True)
-    print(f"❌ ERROR loading API routes: {e}")
+    print(f"[ERROR] loading API routes: {e}")
     import traceback
     traceback.print_exc()
     # Re-raise to fail startup so we can see the error
