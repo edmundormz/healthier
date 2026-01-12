@@ -17,7 +17,8 @@ pydantic = "^2.5.3"
 pydantic-settings = "^2.1.0"
 
 # Database - SQLAlchemy + Async
-sqlalchemy = "^2.0.25"
+# Note: 2.0.36+ required for Python 3.13 compatibility
+sqlalchemy = "^2.0.36"
 asyncpg = "^0.31.0"  # Updated to 0.31.0 for pre-built wheels on Windows
 alembic = "^1.13.1"
 
