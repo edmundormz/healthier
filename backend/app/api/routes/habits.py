@@ -17,8 +17,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.models import User
 from app.services.habit_service import HabitService
-from app.services import UserService
 from app.schemas import (
     HabitCreate,
     HabitUpdate,
@@ -36,27 +37,25 @@ router = APIRouter(prefix="/habits", tags=["habits"])
     description="Creates a new habit for the specified user."
 )
 async def create_habit(
-    user_id: UUID = Query(..., description="User UUID (owner of the habit)"),
     habit_data: HabitCreate = ...,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> HabitResponse:
     """
-    Create a new habit.
+    Create a new habit for the current user.
     
     Args:
-        user_id: User UUID (owner of the habit)
         habit_data: Habit creation data
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
         Created habit
         
-    Raises:
-        HTTPException 404: If user not found
-        
     Example:
     ```bash
-    POST /api/habits/?user_id=550e8400-e29b-41d4-a716-446655440000
+    POST /api/habits/
+    Authorization: Bearer <supabase_token>
     {
         "name": "Walk 10k steps",
         "type": "numeric",
@@ -65,18 +64,9 @@ async def create_habit(
     }
     ```
     """
-    # Verify user exists
-    user_service = UserService(db)
-    user = await user_service.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id {user_id} not found"
-        )
-    
-    # Create habit
+    # Create habit for current user
     service = HabitService(db)
-    habit = await service.create_habit(user_id, habit_data)
+    habit = await service.create_habit(current_user.id, habit_data)
     await db.commit()
     
     return HabitResponse.model_validate(habit)
@@ -89,40 +79,30 @@ async def create_habit(
     description="Returns habits for a specific user."
 )
 async def list_habits(
-    user_id: UUID = Query(..., description="User UUID"),
-    include_deleted: bool = Query(False, description="Include soft-deleted habits"),
     active_only: bool = Query(False, description="Only return active habits"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[HabitResponse]:
     """
-    Get all habits for a user.
+    Get all habits for the current user.
     
     Args:
-        user_id: User UUID
-        include_deleted: Include soft-deleted habits
         active_only: Only return active habits
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
-        List of habits
+        List of habits for the current user
         
     Example:
     ```bash
-    GET /api/habits/?user_id=550e8400-e29b-41d4-a716-446655440000
-    GET /api/habits/?user_id=550e8400-e29b-41d4-a716-446655440000&active_only=true
+    GET /api/habits/
+    GET /api/habits/?active_only=true
+    Authorization: Bearer <supabase_token>
     ```
     """
-    # Verify user exists
-    user_service = UserService(db)
-    user = await user_service.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id {user_id} not found"
-        )
-    
     service = HabitService(db)
-    habits = await service.get_user_habits(user_id, include_deleted, active_only)
+    habits = await service.get_user_habits(current_user.id, include_deleted=False, active_only=active_only)
     return [HabitResponse.model_validate(habit) for habit in habits]
 
 
@@ -134,24 +114,27 @@ async def list_habits(
 )
 async def get_habit(
     habit_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> HabitResponse:
     """
-    Get a habit by ID.
+    Get a habit by ID (only if owned by current user).
     
     Args:
         habit_id: Habit UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
         Habit data
         
     Raises:
-        HTTPException 404: If habit not found
+        HTTPException 404: If habit not found or not owned by user
         
     Example:
     ```bash
     GET /api/habits/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     ```
     """
     service = HabitService(db)
@@ -161,6 +144,13 @@ async def get_habit(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Habit with id {habit_id} not found"
+        )
+    
+    # Verify habit belongs to current user
+    if habit.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this habit"
         )
     
     return HabitResponse.model_validate(habit)
@@ -175,14 +165,16 @@ async def get_habit(
 async def update_habit(
     habit_id: UUID,
     habit_data: HabitUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> HabitResponse:
     """
-    Update a habit.
+    Update a habit (only if owned by current user).
     
     Args:
         habit_id: Habit UUID
         habit_data: Fields to update (all optional)
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
@@ -190,10 +182,12 @@ async def update_habit(
         
     Raises:
         HTTPException 404: If habit not found
+        HTTPException 403: If habit not owned by user
         
     Example:
     ```bash
     PUT /api/habits/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     {
         "name": "Walk 12k steps",
         "target_value": 12000,
@@ -203,12 +197,19 @@ async def update_habit(
     """
     service = HabitService(db)
     
-    # Check if habit exists
+    # Check if habit exists and belongs to user
     habit = await service.get_habit_by_id(habit_id)
     if not habit:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Habit with id {habit_id} not found"
+        )
+    
+    # Verify habit belongs to current user
+    if habit.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to update this habit"
         )
     
     # Update habit
@@ -226,30 +227,43 @@ async def update_habit(
 )
 async def delete_habit(
     habit_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> None:
     """
-    Soft delete a habit.
+    Delete a habit (only if owned by current user).
     
     Args:
         habit_id: Habit UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Raises:
         HTTPException 404: If habit not found
+        HTTPException 403: If habit not owned by user
         
     Example:
     ```bash
     DELETE /api/habits/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     ```
     """
     service = HabitService(db)
-    success = await service.delete_habit(habit_id)
     
-    if not success:
+    # Check if habit exists and belongs to user
+    habit = await service.get_habit_by_id(habit_id)
+    if not habit:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Habit with id {habit_id} not found"
         )
     
+    # Verify habit belongs to current user
+    if habit.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete this habit"
+        )
+    
+    success = await service.delete_habit(habit_id)
     await db.commit()

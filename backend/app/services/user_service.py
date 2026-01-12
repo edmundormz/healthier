@@ -21,12 +21,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_password, verify_password
 from app.models import User, Family, FamilyMembership
 from app.schemas import (
     UserCreate,
     UserUpdate,
     FamilyCreate,
     FamilyMembershipCreate,
+    UserSignup,
 )
 
 
@@ -64,7 +66,9 @@ class UserService:
     
     async def create_user(self, user_data: UserCreate) -> User:
         """
-        Create a new user.
+        Create a new user (without password).
+        
+        For user registration with password, use create_user_with_password().
         
         Args:
             user_data: User creation data
@@ -88,6 +92,87 @@ class UserService:
         self.db.add(user)
         await self.db.flush()  # Get ID without committing
         await self.db.refresh(user)  # Load default values
+        return user
+    
+    async def create_user_with_password(self, user_data: UserSignup) -> User:
+        """
+        Create a new user with password (for registration).
+        
+        This method:
+        1. Hashes the password before storing
+        2. Creates the user in database
+        3. Never stores plain text password
+        
+        Args:
+            user_data: User signup data (includes password)
+            
+        Returns:
+            Created user (password is hashed)
+            
+        Example:
+        ```python
+        user = await service.create_user_with_password(
+            UserSignup(
+                email="candy@example.com",
+                password="SecurePassword123!",
+                full_name="Candy Hernández"
+            )
+        )
+        ```
+        """
+        # Extract password and hash it
+        password = user_data.password
+        hashed = hash_password(password)
+        
+        # Create user data without password
+        user_dict = user_data.model_dump(exclude={"password"})
+        user_dict["hashed_password"] = hashed
+        
+        # Create user
+        user = User(**user_dict)
+        self.db.add(user)
+        await self.db.flush()
+        await self.db.refresh(user)
+        return user
+    
+    async def authenticate_user(self, email: str, password: str) -> Optional[User]:
+        """
+        Authenticate a user with email and password.
+        
+        This method:
+        1. Finds user by email
+        2. Verifies password against stored hash
+        3. Returns user if authentication succeeds
+        
+        Args:
+            email: User email
+            password: Plain text password
+            
+        Returns:
+            User if authentication succeeds, None otherwise
+            
+        Example:
+        ```python
+        user = await service.authenticate_user(
+            "candy@example.com",
+            "SecurePassword123!"
+        )
+        if user:
+            print("Login successful!")
+        ```
+        """
+        user = await self.get_user_by_email(email)
+        if not user:
+            return None
+        
+        # Check if user has password set
+        if not user.hashed_password:
+            return None
+        
+        # Verify password
+        if not verify_password(password, user.hashed_password):
+            return None
+        
         return user
     
     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
@@ -238,6 +323,76 @@ class UserService:
         user.restore()
         await self.db.flush()
         return True
+    
+    async def sync_user_from_supabase(
+        self,
+        user_id: UUID,
+        jwt_payload: dict
+    ) -> Optional[User]:
+        """
+        Sync user from Supabase auth.users to public.users.
+        
+        When a user signs up via Supabase Auth, they exist in auth.users
+        but not in public.users. This method creates/updates the user
+        in public.users based on Supabase Auth data.
+        
+        Args:
+            user_id: User UUID from Supabase Auth (from JWT 'sub' claim)
+            jwt_payload: Decoded JWT payload from Supabase
+            
+        Returns:
+            Synced User object, None if sync failed
+            
+        Example:
+        ```python
+        # User signs up via Supabase Auth
+        # First API call with their token triggers sync
+        user = await service.sync_user_from_supabase(user_id, jwt_payload)
+        ```
+        """
+        # Extract user info from JWT payload
+        email = jwt_payload.get("email", "")
+        user_metadata = jwt_payload.get("user_metadata", {})
+        full_name = user_metadata.get("full_name", email.split("@")[0] if email else "User")
+        
+        # Check if user already exists
+        existing_user = await self.get_user_by_id(user_id)
+        
+        if existing_user:
+            # Update existing user with latest info from Supabase
+            existing_user.email = email
+            existing_user.full_name = full_name
+            # Update other fields from metadata if needed
+            if "language" in user_metadata:
+                existing_user.language = user_metadata["language"]
+            if "timezone" in user_metadata:
+                existing_user.timezone = user_metadata["timezone"]
+            
+            await self.db.flush()
+            await self.db.refresh(existing_user)
+            return existing_user
+        
+        # Create new user from Supabase Auth data
+        from app.schemas import UserCreate
+        
+        user_data = UserCreate(
+            email=email,
+            full_name=full_name,
+            language=user_metadata.get("language", "es"),
+            timezone=user_metadata.get("timezone", "America/Chicago"),
+        )
+        
+        # Create user with the same ID as Supabase Auth user
+        user = User(
+            id=user_id,  # Use same ID as auth.users
+            **user_data.model_dump()
+        )
+        
+        self.db.add(user)
+        await self.db.flush()
+        await self.db.refresh(user)
+        
+        return user
 
 
 class FamilyService:

@@ -13,12 +13,13 @@ This module handles:
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.models import User
 from app.services.routine_service import RoutineService
-from app.services import UserService
 from app.schemas import (
     RoutineCreate,
     RoutineUpdate,
@@ -36,45 +37,34 @@ router = APIRouter(prefix="/routines", tags=["routines"])
     description="Creates a new routine for the specified user."
 )
 async def create_routine(
-    user_id: UUID = Query(..., description="User UUID (owner of the routine)"),
     routine_data: RoutineCreate = ...,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> RoutineResponse:
     """
-    Create a new routine.
+    Create a new routine for the current user.
     
     Args:
-        user_id: User UUID (owner of the routine)
         routine_data: Routine creation data
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
         Created routine
         
-    Raises:
-        HTTPException 404: If user not found
-        
     Example:
     ```bash
-    POST /api/routines/?user_id=550e8400-e29b-41d4-a716-446655440000
+    POST /api/routines/
+    Authorization: Bearer <supabase_token>
     {
         "name": "Morning Routine",
         "description": "Daily morning protocol"
     }
     ```
     """
-    # Verify user exists
-    user_service = UserService(db)
-    user = await user_service.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id {user_id} not found"
-        )
-    
-    # Create routine
+    # Create routine for current user
     service = RoutineService(db)
-    routine = await service.create_routine(user_id, routine_data)
+    routine = await service.create_routine(current_user.id, routine_data)
     await db.commit()
     
     return RoutineResponse.model_validate(routine)
@@ -87,37 +77,27 @@ async def create_routine(
     description="Returns routines for a specific user."
 )
 async def list_routines(
-    user_id: UUID = Query(..., description="User UUID"),
-    include_deleted: bool = Query(False, description="Include soft-deleted routines"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[RoutineResponse]:
     """
-    Get all routines for a user.
+    Get all routines for the current user.
     
     Args:
-        user_id: User UUID
-        include_deleted: Include soft-deleted routines
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
-        List of routines
+        List of routines for the current user
         
     Example:
     ```bash
-    GET /api/routines/?user_id=550e8400-e29b-41d4-a716-446655440000
+    GET /api/routines/
+    Authorization: Bearer <supabase_token>
     ```
     """
-    # Verify user exists
-    user_service = UserService(db)
-    user = await user_service.get_user_by_id(user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"User with id {user_id} not found"
-        )
-    
     service = RoutineService(db)
-    routines = await service.get_user_routines(user_id, include_deleted)
+    routines = await service.get_user_routines(current_user.id, include_deleted=False)
     return [RoutineResponse.model_validate(routine) for routine in routines]
 
 
@@ -129,24 +109,27 @@ async def list_routines(
 )
 async def get_routine(
     routine_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> RoutineResponse:
     """
-    Get a routine by ID.
+    Get a routine by ID (only if owned by current user).
     
     Args:
         routine_id: Routine UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
         Routine data
         
     Raises:
-        HTTPException 404: If routine not found
+        HTTPException 404: If routine not found or not owned by user
         
     Example:
     ```bash
     GET /api/routines/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     ```
     """
     service = RoutineService(db)
@@ -156,6 +139,13 @@ async def get_routine(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Routine with id {routine_id} not found"
+        )
+    
+    # Verify routine belongs to current user
+    if routine.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this routine"
         )
     
     return RoutineResponse.model_validate(routine)
@@ -170,14 +160,16 @@ async def get_routine(
 async def update_routine(
     routine_id: UUID,
     routine_data: RoutineUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> RoutineResponse:
     """
-    Update a routine.
+    Update a routine (only if owned by current user).
     
     Args:
         routine_id: Routine UUID
         routine_data: Fields to update (all optional)
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
@@ -185,10 +177,12 @@ async def update_routine(
         
     Raises:
         HTTPException 404: If routine not found
+        HTTPException 403: If routine not owned by user
         
     Example:
     ```bash
     PUT /api/routines/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     {
         "name": "Updated Morning Routine",
         "description": "New description"
@@ -197,12 +191,19 @@ async def update_routine(
     """
     service = RoutineService(db)
     
-    # Check if routine exists
+    # Check if routine exists and belongs to user
     routine = await service.get_routine_by_id(routine_id)
     if not routine:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Routine with id {routine_id} not found"
+        )
+    
+    # Verify routine belongs to current user
+    if routine.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to update this routine"
         )
     
     # Update routine
@@ -220,30 +221,43 @@ async def update_routine(
 )
 async def delete_routine(
     routine_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> None:
     """
-    Soft delete a routine.
+    Delete a routine (only if owned by current user).
     
     Args:
         routine_id: Routine UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Raises:
         HTTPException 404: If routine not found
+        HTTPException 403: If routine not owned by user
         
     Example:
     ```bash
     DELETE /api/routines/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     ```
     """
     service = RoutineService(db)
-    success = await service.delete_routine(routine_id)
     
-    if not success:
+    # Check if routine exists and belongs to user
+    routine = await service.get_routine_by_id(routine_id)
+    if not routine:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Routine with id {routine_id} not found"
         )
     
+    # Verify routine belongs to current user
+    if routine.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete this routine"
+        )
+    
+    success = await service.delete_routine(routine_id)
     await db.commit()

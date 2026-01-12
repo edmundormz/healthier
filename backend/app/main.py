@@ -175,17 +175,20 @@ async def test_list_users(db: AsyncSession = Depends(get_db)):
 # Import and register API routers
 # If there's an import error, it will be caught here
 try:
-    from app.api.routes import users, routines, habits
+    from app.api.routes import auth, users, routines, habits
     
     # Register all API routers
     # Each router has its own prefix, so we add /api here
-    # Final paths will be: /api/users/*, /api/routines/*, /api/habits/*
+    # Final paths will be: /api/auth/*, /api/users/*, /api/routines/*, /api/habits/*
+    # Note: Auth router is empty (Supabase handles auth on frontend)
+    app.include_router(auth.router, prefix="/api")
     app.include_router(users.router, prefix="/api")
     app.include_router(routines.router, prefix="/api")
     app.include_router(habits.router, prefix="/api")
     
-    logger.info("api_routes_loaded", users=True, routines=True, habits=True)
+    logger.info("api_routes_loaded", auth=True, users=True, routines=True, habits=True)
     print("✅ API routes loaded successfully!")
+    print(f"   - Auth router: {len(auth.router.routes)} routes (Supabase Auth on frontend)")
     print(f"   - Users router: {len(users.router.routes)} routes")
     print(f"   - Routines router: {len(routines.router.routes)} routes")
     print(f"   - Habits router: {len(habits.router.routes)} routes")

@@ -78,6 +78,13 @@ class User(BaseModelWithSoftDelete):
         index=True,
     )
     
+    # Password (hashed, never store plain text!)
+    # This field is nullable to support existing users and optional auth methods
+    hashed_password: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    
     full_name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,

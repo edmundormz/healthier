@@ -23,6 +23,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.models import User
 from app.services import UserService, FamilyService
 from app.schemas import (
     UserCreate,
@@ -141,13 +143,15 @@ async def list_users(
 )
 async def get_user(
     user_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """
-    Get a user by ID.
+    Get a user by ID (only if it's the current user).
     
     Args:
         user_id: User UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
@@ -155,12 +159,21 @@ async def get_user(
         
     Raises:
         HTTPException 404: If user not found
+        HTTPException 403: If user is not the current user
         
     Example:
     ```bash
     GET /api/users/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     ```
     """
+    # Users can only view their own profile
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own profile"
+        )
+    
     service = UserService(db)
     user = await service.get_user_by_id(user_id)
     
@@ -182,10 +195,11 @@ async def get_user(
 async def update_user(
     user_id: UUID,
     user_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """
-    Update a user.
+    Update a user (only if it's the current user).
     
     This endpoint uses Pydantic's `exclude_unset=True` to only update
     fields that are provided in the request.
@@ -193,6 +207,7 @@ async def update_user(
     Args:
         user_id: User UUID
         user_data: Fields to update (all optional)
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
@@ -200,16 +215,25 @@ async def update_user(
         
     Raises:
         HTTPException 404: If user not found
+        HTTPException 403: If user is not the current user
         
     Example:
     ```bash
     PUT /api/users/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     {
         "full_name": "Candy Hernández-Ramirez",
         "notification_enabled": false
     }
     ```
     """
+    # Users can only update their own profile
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only update your own profile"
+        )
+    
     service = UserService(db)
     
     # Check if user exists
@@ -235,10 +259,11 @@ async def update_user(
 )
 async def delete_user(
     user_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> None:
     """
-    Soft delete a user.
+    Soft delete a user (only if it's the current user).
     
     This doesn't actually delete the record from the database.
     Instead, it sets the `deleted_at` timestamp, which hides
@@ -246,16 +271,26 @@ async def delete_user(
     
     Args:
         user_id: User UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Raises:
         HTTPException 404: If user not found
+        HTTPException 403: If user is not the current user
         
     Example:
     ```bash
     DELETE /api/users/550e8400-e29b-41d4-a716-446655440000
+    Authorization: Bearer <supabase_token>
     ```
     """
+    # Users can only delete their own account
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own account"
+        )
+    
     service = UserService(db)
     success = await service.soft_delete_user(user_id)
     
@@ -276,13 +311,17 @@ async def delete_user(
 )
 async def restore_user(
     user_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """
-    Restore a soft-deleted user.
+    Restore a soft-deleted user (only if it's the current user).
+    
+    This reverses the soft delete by setting `deleted_at` to NULL.
     
     Args:
         user_id: User UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
@@ -290,7 +329,20 @@ async def restore_user(
         
     Raises:
         HTTPException 404: If user not found or not deleted
+        HTTPException 403: If user is not the current user
+        
+    Example:
+    ```bash
+    POST /api/users/550e8400-e29b-41d4-a716-446655440000/restore
+    Authorization: Bearer <supabase_token>
+    ```
     """
+    # Users can only restore their own account
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only restore your own account"
+        )
     service = UserService(db)
     success = await service.restore_user(user_id)
     
@@ -321,14 +373,16 @@ async def restore_user(
 async def create_family(
     user_id: UUID,
     family_data: FamilyCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> FamilyResponse:
     """
-    Create a family and add the user as admin.
+    Create a family and add the user as admin (only if it's the current user).
     
     Args:
         user_id: User UUID (will be added as admin)
         family_data: Family creation data
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
@@ -336,7 +390,24 @@ async def create_family(
         
     Raises:
         HTTPException 404: If user not found
+        HTTPException 403: If user is not the current user
+        
+    Example:
+    ```bash
+    POST /api/users/550e8400-e29b-41d4-a716-446655440000/families
+    Authorization: Bearer <supabase_token>
+    {
+        "name": "Hernández-Ramirez Family"
+    }
+    ```
     """
+    # Users can only create families for themselves
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only create families for yourself"
+        )
+    
     # Verify user exists
     user_service = UserService(db)
     user = await user_service.get_user_by_id(user_id)
@@ -369,18 +440,36 @@ async def create_family(
 )
 async def get_user_families(
     user_id: UUID,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[FamilyResponse]:
     """
-    Get all families a user belongs to.
+    Get all families for a user (only if it's the current user).
     
     Args:
         user_id: User UUID
+        current_user: Authenticated user (from Supabase JWT token)
         db: Database session
         
     Returns:
-        List of families
+        List of families the user belongs to
+        
+    Raises:
+        HTTPException 404: If user not found
+        HTTPException 403: If user is not the current user
+        
+    Example:
+    ```bash
+    GET /api/users/550e8400-e29b-41d4-a716-446655440000/families
+    Authorization: Bearer <supabase_token>
+    ```
     """
+    # Users can only view their own families
+    if user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own families"
+        )
     # Verify user exists
     user_service = UserService(db)
     user = await user_service.get_user_by_id(user_id)

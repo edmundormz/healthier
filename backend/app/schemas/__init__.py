@@ -55,6 +55,13 @@ from app.schemas.habit import (
     HabitStreakResponse,
 )
 
+from app.schemas.auth import (
+    UserSignup,
+    UserLogin,
+    TokenResponse,
+    UserInfo,
+)
+
 __all__ = [
     # Users
     "UserBase",
@@ -98,4 +105,9 @@ __all__ = [
     "HabitLogUpdate",
     "HabitLogResponse",
     "HabitStreakResponse",
+    # Auth
+    "UserSignup",
+    "UserLogin",
+    "TokenResponse",
+    "UserInfo",
 ]

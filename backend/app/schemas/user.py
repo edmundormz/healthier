@@ -44,7 +44,10 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """
-    Schema for creating a new user.
+    Schema for creating a new user (without password).
+    
+    Note: For user registration with password, use UserSignup from auth schemas.
+    This schema is for admin/user creation without password.
     
     Example:
     ```json
