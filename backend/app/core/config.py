@@ -14,6 +14,7 @@ See: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
 """
 
 from typing import List
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 
@@ -52,7 +53,9 @@ class Settings(BaseSettings):
 
     # API Configuration
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    # Render uses PORT env var, but we use API_PORT in config
+    # Default to 8000 for local dev, or use PORT if set
+    API_PORT: int = int(os.environ.get("PORT", "8000"))
     API_TITLE: str = "CH Health OS API"
     API_VERSION: str = "0.1.0"
 
