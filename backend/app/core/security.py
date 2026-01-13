@@ -3,8 +3,12 @@ Security Utilities
 
 This module handles:
 - Password hashing and verification (bcrypt)
-- JWT token generation and validation
-- Token expiration and refresh logic
+
+⚠️ LEGACY JWT FUNCTIONS (NOT USED):
+- create_access_token() and decode_access_token() are NOT used
+- This project uses Supabase Auth for JWT token validation
+- Supabase validates tokens using their own public keys (JWKS)
+- These functions are kept for potential future use or reference
 
 Why bcrypt?
 - Industry standard for password hashing
@@ -12,18 +16,10 @@ Why bcrypt?
 - Slow by design (prevents brute force attacks)
 - See: https://en.wikipedia.org/wiki/Bcrypt
 
-Why JWT?
-- Stateless authentication (no server-side sessions)
-- Can include user info in token
-- Works well with microservices
-- See: https://jwt.io/introduction
-
 Security Best Practices:
 - Never store plain text passwords
 - Always hash passwords before storing
-- Use strong secret keys (32+ characters)
-- Set reasonable token expiration times
-- Validate tokens on every request
+- Validate tokens on every request (using Supabase Auth)
 """
 
 from datetime import datetime, timedelta, timezone
@@ -100,6 +96,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
+    ⚠️ LEGACY FUNCTION - NOT USED
+    
+    This function is NOT used in the current application.
+    We use Supabase Auth for JWT token generation and validation.
+    
+    Kept for reference or potential future use.
+    
     Create a JWT access token.
     
     JWT tokens contain:
@@ -116,54 +119,27 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         data: Dictionary of claims to include in token
             Must include "sub" (subject/user identifier)
         expires_delta: Optional custom expiration time
-            If None, uses ACCESS_TOKEN_EXPIRE_MINUTES from settings
             
     Returns:
         Encoded JWT token string
         
-    Example:
-    ```python
-    token = create_access_token(
-        data={"sub": "user@example.com", "user_id": str(user.id)}
-    )
-    # Client sends this token in Authorization header
-    ```
-    
     See: https://python-jose.readthedocs.io/en/latest/jwt/api.html
     """
-    to_encode = data.copy()
-    
-    # Set expiration time
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-    
-    # Add expiration to token
-    to_encode.update({"exp": expire})
-    
-    # Encode token with secret key
-    # SECRET_KEY must be kept secret (never commit to git!)
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.SECRET_KEY,
-        algorithm=settings.ALGORITHM
+    raise NotImplementedError(
+        "This function is not used. Use Supabase Auth for JWT token generation."
     )
-    
-    return encoded_jwt
 
 
 def decode_access_token(token: str) -> Optional[dict]:
     """
-    Decode and validate a JWT access token.
+    ⚠️ LEGACY FUNCTION - NOT USED
     
-    This function:
-    1. Decodes the token
-    2. Verifies signature (ensures token wasn't tampered)
-    3. Checks expiration
-    4. Returns payload if valid
+    This function is NOT used in the current application.
+    We use Supabase Auth for JWT token validation (see supabase_auth.py).
+    
+    Kept for reference or potential future use.
+    
+    Decode and validate a JWT access token.
     
     Args:
         token: JWT token string (from Authorization header)
@@ -171,29 +147,10 @@ def decode_access_token(token: str) -> Optional[dict]:
     Returns:
         Token payload (dict with user info) if valid, None if invalid
         
-    Raises:
-        JWTError: If token is invalid, expired, or tampered with
-        
-    Example:
-    ```python
-    payload = decode_access_token(token)
-    if payload:
-        user_id = payload.get("sub")
-        print(f"Authenticated user: {user_id}")
-    ```
-    
     Security Notes:
-    - Always validate tokens on every request
-    - Never trust client data without verification
-    - Expired tokens are automatically rejected
+    - Use verify_supabase_jwt() from supabase_auth.py instead
+    - Supabase validates tokens using their own public keys (JWKS)
     """
-    try:
-        payload = jwt.decode(
-            token,
-            settings.SECRET_KEY,
-            algorithms=[settings.ALGORITHM]
-        )
-        return payload
-    except JWTError:
-        # Token is invalid, expired, or tampered with
-        return None
+    raise NotImplementedError(
+        "This function is not used. Use verify_supabase_jwt() from supabase_auth.py instead."
+    )

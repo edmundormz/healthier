@@ -146,7 +146,6 @@ ENVIRONMENT=production
 DEBUG=False
 API_HOST=0.0.0.0
 API_PORT=8000
-SECRET_KEY=<generate-secure-key>
 
 # CORS
 CORS_ORIGINS=["https://your-frontend.vercel.app"]

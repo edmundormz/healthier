@@ -152,7 +152,6 @@ See `.env.example` for all available configuration options.
 **Important for production:**
 - Set `ENVIRONMENT=production`
 - Set `DEBUG=false`
-- Generate strong `SECRET_KEY` (use: `openssl rand -hex 32`)
 - Restrict `CORS_ORIGINS` to your frontend domain
 
 ## Deployment

@@ -59,11 +59,6 @@ class Settings(BaseSettings):
     # CORS - can be comma-separated string or list
     CORS_ORIGINS: List[str] | str = ["http://localhost:3000", "http://localhost:8000"]
 
-    # Security
-    SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
     # Logging
     LOG_LEVEL: str = "INFO"
 
@@ -93,6 +88,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,  # Environment variable names must match exactly
+        extra="ignore",  # Ignore extra fields in .env (backward compatibility)
     )
 
 

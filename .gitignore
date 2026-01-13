@@ -41,6 +41,9 @@ venv.bak/
 .env
 .env.local
 .env.*.local
+.env.backend
+.env.frontend
+.env.production
 
 # Logs
 *.log
