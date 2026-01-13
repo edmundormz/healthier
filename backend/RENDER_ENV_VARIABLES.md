@@ -1,7 +1,9 @@
 # Render Environment Variables - Production
 
 **Date:** January 12, 2026, 8:00 PM CST  
+**Last Updated:** January 12, 2026, 8:00 PM CST  
 **Purpose:** Environment variables for Render deployment  
+**Workspace:** `Inventa - Healthier`  
 **Custom Domains:**
 - Backend: `healthier-api.inventasolutions.ai`
 - Frontend: `healthier.inventasolutions.ai`
@@ -10,6 +12,13 @@
 
 ## 📋 How to Add These to Render
 
+### Step 1: Select Workspace
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Click the **workspace dropdown** in the top-left corner
+3. Select **"Inventa - Healthier"** from the list
+4. All services will be created under this workspace
+
+### Step 2: Add Environment Variables
 1. Go to Render Dashboard → Your Service
 2. Click **Environment** tab
 3. Add each variable below (click "Add Environment Variable")
@@ -154,6 +163,7 @@ INFO
 ## 🚀 Deployment Configuration
 
 **Service Settings:**
+- **Workspace:** `Inventa - Healthier`
 - **Name:** `ch-health-api`
 - **Runtime:** Python 3
 - **Root Directory:** `backend`

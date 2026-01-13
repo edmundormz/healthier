@@ -1,0 +1,34 @@
+# Render Blueprint Configuration
+# This file defines the services to deploy on Render
+# Workspace: Inventa - Healthier
+# 
+# To use this blueprint:
+# 1. Go to Render Dashboard → New → Blueprint
+# 2. Connect your GitHub repository
+# 3. Render will detect this file and create the services
+
+services:
+  - type: web
+    name: ch-health-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        value: ${PORT}
+      - key: TIMEZONE
+        value: America/Chicago
+      - key: LOG_LEVEL
+        value: INFO
+    # Note: Add sensitive environment variables (DATABASE_URL, API keys, etc.)
+    # through Render Dashboard → Environment tab after service creation

@@ -1,15 +1,27 @@
 # Deployment Quick Reference
 
-**Date:** January 12, 2026, 8:30 PM CST
+**Date:** January 12, 2026, 8:30 PM CST  
+**Last Updated:** January 12, 2026, 8:30 PM CST
 
 ---
 
 ## 🚀 Backend Deployment (Render)
 
+### Workspace Configuration
+
+**Workspace:** `Inventa - Healthier`
+
+To set your workspace in Render:
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Click the workspace dropdown in the top-left corner
+3. Select **"Inventa - Healthier"** from the list
+4. All services will be created under this workspace
+
 ### Configuration
 
 | Setting | Value |
 |---------|-------|
+| **Workspace** | `Inventa - Healthier` |
 | **Service Name** | `ch-health-api` |
 | **Runtime** | Python 3 |
 | **Root Directory** | `backend` |
