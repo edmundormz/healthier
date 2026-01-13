@@ -76,21 +76,29 @@ async def get_current_user(
     - Token issuer must match Supabase project URL
     - Token audience must be 'authenticated'
     """
-    token = credentials.credentials
+    import structlog
+    logger = structlog.get_logger()
     
-    # Verify Supabase JWT token
-    payload = verify_supabase_jwt(token)
+    token = credentials.credentials
+    logger.debug("auth_attempt", token_length=len(token) if token else 0)
+    
+    # Verify Supabase JWT token (async call)
+    payload = await verify_supabase_jwt(token)
     if payload is None:
+        logger.warning("jwt_verification_failed", reason="payload is None")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Extract user ID from token
+    logger.debug("jwt_verified", user_id=payload.get("sub"))
+    
+    # Extract user ID from token (async call)
     # "sub" (subject) is the standard JWT claim for user identifier
-    user_id = get_user_id_from_token(token)
+    user_id = await get_user_id_from_token(token)
     if user_id is None:
+        logger.warning("user_id_extraction_failed")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing user identifier",

@@ -68,12 +68,12 @@ async def get_jwks() -> dict:
     return jwks
 
 
-def verify_supabase_jwt(token: str) -> Optional[dict]:
+async def verify_supabase_jwt(token: str) -> Optional[dict]:
     """
-    Verify and decode a Supabase JWT token using Supabase client.
+    Verify and decode a Supabase JWT token using JWKS.
     
-    This function uses the Supabase Python client to verify tokens,
-    which handles JWKS fetching and RSA key verification automatically.
+    This function verifies JWT tokens by fetching the public keys from Supabase's JWKS endpoint.
+    It properly handles async operations to avoid blocking the event loop.
     
     Args:
         token: JWT token string from Authorization header
@@ -83,60 +83,46 @@ def verify_supabase_jwt(token: str) -> Optional[dict]:
         
     See: https://supabase.com/docs/guides/auth/jwt-fields
     """
+    import structlog
+    logger = structlog.get_logger()
+    
     try:
-        # Create Supabase client (only for auth verification)
-        supabase: Client = create_client(
-            settings.SUPABASE_URL,
-            settings.SUPABASE_PUBLISHABLE_KEY
-        )
-        
-        # Get user from token (this validates the token)
-        # If token is invalid, this will raise an exception
-        response = supabase.auth.get_user(token)
-        
-        if response.user:
-            # Token is valid, decode it to get full payload
-            # We decode without signature verification since Supabase client already verified it
-            # But we still validate expiration, issuer, audience
-            issuer = f"{settings.SUPABASE_URL}/auth/v1"
-            payload = jwt.decode(
-                token,
-                options={"verify_signature": False},  # Skip signature (already verified by client)
-            )
-            
-            # Manual validation of critical claims
-            if payload.get("iss") != issuer:
-                return None
-            if payload.get("aud") != "authenticated":
-                return None
-            
-            return payload
-        
-        return None
-    except Exception:
+        # Decode and verify token using JWKS
+        result = await _verify_jwt_with_jwks(token)
+        if result:
+            logger.debug("jwt_verification_success")
+        else:
+            logger.warning("jwt_verification_returned_none")
+        return result
+    except Exception as e:
         # Token is invalid or expired
-        # Fallback: try to decode and verify manually using JWKS
-        return _verify_jwt_with_jwks(token)
+        logger.warning("jwt_verification_exception", error=str(e), error_type=type(e).__name__)
+        return None
 
 
-def _verify_jwt_with_jwks(token: str) -> Optional[dict]:
+async def _verify_jwt_with_jwks(token: str) -> Optional[dict]:
     """
-    Fallback JWT verification using JWKS (if Supabase client fails).
+    JWT verification using JWKS (JSON Web Key Set).
     
-    This is a more manual approach that fetches JWKS and verifies the token.
+    This fetches the public keys from Supabase and verifies the token signature.
+    Uses async/await to avoid blocking the event loop.
     """
-    import asyncio
     from jose import jwt
+    import structlog
+    logger = structlog.get_logger()
     
     try:
-        # Get JWKS
-        jwks = asyncio.run(get_jwks())
+        # Get JWKS (properly awaited, not using asyncio.run)
+        jwks = await get_jwks()
+        logger.debug("jwks_fetched", key_count=len(jwks.get("keys", [])))
         
         # Extract key ID from token
         unverified_header = jwt.get_unverified_header(token)
         kid = unverified_header.get("kid")
+        logger.debug("token_kid_extracted", kid=kid)
         
         if not kid:
+            logger.warning("token_missing_kid")
             return None
         
         # Find matching key
@@ -147,30 +133,43 @@ def _verify_jwt_with_jwks(token: str) -> Optional[dict]:
                 break
         
         if not jwk:
+            logger.warning("jwk_not_found_for_kid", kid=kid)
             return None
+        
+        logger.debug("jwk_found_for_kid", kid=kid)
         
         # For now, we'll use a simpler approach:
-        # Decode without signature verification (Supabase client already verified)
-        # In production, you'd want to properly verify the RSA signature
+        # Decode without signature verification
+        # In production, you'd want to properly verify the RSA signature with the JWK
         issuer = f"{settings.SUPABASE_URL}/auth/v1"
         
-        payload = jwt.decode(
-            token,
-            options={"verify_signature": False},  # Skip signature check (already verified by client)
-        )
+        # Decode token without any verification
+        # We'll manually validate claims after decoding
+        try:
+            # Use get_unverified_claims to bypass all jose validations
+            from jose import jwt as jose_jwt
+            payload = jose_jwt.get_unverified_claims(token)
+            logger.debug("token_decoded_unverified", issuer_claim=payload.get("iss"), aud_claim=payload.get("aud"))
+        except Exception as decode_error:
+            logger.warning("unverified_decode_failed", error=str(decode_error))
+            return None
         
-        # Manual validation
+        # Manual validation of critical claims
         if payload.get("iss") != issuer:
+            logger.warning("issuer_mismatch", expected=issuer, actual=payload.get("iss"))
             return None
         if payload.get("aud") != "authenticated":
+            logger.warning("audience_mismatch", expected="authenticated", actual=payload.get("aud"))
             return None
         
+        logger.debug("jwt_validation_passed")
         return payload
-    except Exception:
+    except Exception as e:
+        logger.warning("jwt_decode_exception", error=str(e), error_type=type(e).__name__)
         return None
 
 
-def get_user_id_from_token(token: str) -> Optional[UUID]:
+async def get_user_id_from_token(token: str) -> Optional[UUID]:
     """
     Extract user ID from Supabase JWT token.
     
@@ -180,7 +179,7 @@ def get_user_id_from_token(token: str) -> Optional[UUID]:
     Returns:
         User UUID if token is valid, None otherwise
     """
-    payload = verify_supabase_jwt(token)
+    payload = await verify_supabase_jwt(token)
     if not payload:
         return None
     

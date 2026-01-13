@@ -389,10 +389,23 @@ class UserService:
         )
         
         self.db.add(user)
-        await self.db.flush()
-        await self.db.refresh(user)
         
-        return user
+        try:
+            await self.db.flush()
+            await self.db.refresh(user)
+            return user
+        except Exception as e:
+            # Handle race condition: another parallel request may have created the user
+            # Roll back and try to fetch the user again
+            await self.db.rollback()
+            
+            # Try to fetch the user that was just created by the parallel request
+            existing_user = await self.get_user_by_id(user_id)
+            if existing_user:
+                return existing_user
+            
+            # If still not found, re-raise the original error
+            raise e
 
 
 class FamilyService:
