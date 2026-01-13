@@ -15,6 +15,7 @@ pydantic-settings==2.7.1
 sqlalchemy==2.0.36
 asyncpg==0.30.0
 alembic==1.13.1
+greenlet==3.1.1  # Required for SQLAlchemy async operations
 
 # Supabase
 supabase==2.3.4
