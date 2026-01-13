@@ -68,8 +68,13 @@ class Base(DeclarativeBase):
 # pgbouncer in "transaction" or "statement" mode doesn't support prepared statements
 # Setting statement_cache_size=0 disables prepared statements in asyncpg
 # See: https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#asyncpg
+#
+# Strip pgbouncer parameter from URL as asyncpg doesn't support it
+# Supabase pooled URLs include this, but asyncpg connection happens below pooler level
+database_url = settings.DATABASE_URL.replace("?pgbouncer=true", "").replace("&pgbouncer=true", "")
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    database_url,
     echo=settings.DEBUG,  # Log SQL queries in development
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=5,  # Number of connections to maintain
