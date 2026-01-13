@@ -64,24 +64,19 @@ class Base(DeclarativeBase):
 # This manages the connection pool to the database
 # See: https://docs.sqlalchemy.org/en/20/core/engines.html
 #
-# IMPORTANT: Disable prepared statements for pgbouncer compatibility
-# pgbouncer in "transaction" or "statement" mode doesn't support prepared statements
-# Setting statement_cache_size=0 disables prepared statements in asyncpg
-# See: https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#asyncpg
-#
-# Strip pgbouncer parameter from URL as asyncpg doesn't support it
-# Supabase pooled URLs include this, but asyncpg connection happens below pooler level
-database_url = settings.DATABASE_URL.replace("?pgbouncer=true", "").replace("&pgbouncer=true", "")
-
+# IMPORTANT: For async operations, use DIRECT_URL instead of pooled DATABASE_URL
+# asyncpg doesn't work with Supabase's connection pooler (pgbouncer parameter)
+# DIRECT_URL connects directly to Postgres without pooling
+# The SQLAlchemy engine provides its own connection pooling
 engine = create_async_engine(
-    database_url,
+    settings.DIRECT_URL,
     echo=settings.DEBUG,  # Log SQL queries in development
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=5,  # Number of connections to maintain
     max_overflow=10,  # Additional connections if pool is full
     pool_recycle=3600,  # Recycle connections after 1 hour (prevents stale connections)
     connect_args={
-        "statement_cache_size": 0,  # Disable prepared statements for pgbouncer compatibility
+        "statement_cache_size": 0,  # Disable prepared statements for compatibility
     },
 )
 
