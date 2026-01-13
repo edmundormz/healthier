@@ -53,9 +53,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     API_HOST: str = "0.0.0.0"
-    # Render uses PORT env var, but we use API_PORT in config
-    # Default to 8000 for local dev, or use PORT if set
-    API_PORT: int = int(os.environ.get("PORT", "8000"))
+    API_PORT: int = 8000  # Will be validated and potentially overridden below
     API_TITLE: str = "CH Health OS API"
     API_VERSION: str = "0.1.0"
 
@@ -64,6 +62,32 @@ class Settings(BaseSettings):
 
     # Logging
     LOG_LEVEL: str = "INFO"
+
+    @field_validator("API_PORT", mode="before")
+    @classmethod
+    def parse_api_port(cls, v: str | int) -> int:
+        """
+        Handle API_PORT from environment.
+        
+        Render uses $PORT env var, but some configs set API_PORT='${PORT}'.
+        This validator resolves that to the actual PORT value.
+        
+        Args:
+            v: API port as string or int
+            
+        Returns:
+            Integer port number
+        """
+        if isinstance(v, int):
+            return v
+        
+        # Handle case where API_PORT='${PORT}' (literal string with curly braces)
+        if v == "${PORT}":
+            port_value = os.environ.get("PORT", "8000")
+            return int(port_value)
+        
+        # Normal string to int conversion
+        return int(v)
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
