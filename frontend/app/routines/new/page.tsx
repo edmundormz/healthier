@@ -12,6 +12,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api/client";
 
+interface Routine {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 export default function NewRoutinePage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -25,7 +31,7 @@ export default function NewRoutinePage() {
     setLoading(true);
 
     try {
-      const routine = await api.post("/api/routines/", {
+      const routine = await api.post<Routine>("/api/routines/", {
         name: name.trim(),
         description: description.trim() || null,
       });

@@ -144,8 +144,8 @@ export class ApiClient {
     const url = `${API_BASE_URL}${endpoint}`;
 
     // Prepare headers with authentication
-    const headers: HeadersInit = {
-      ...options.headers,
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
     };
 
     if (token) {

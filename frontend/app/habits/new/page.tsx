@@ -12,6 +12,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api/client";
 
+interface Habit {
+  id: string;
+  name: string;
+  type: "boolean" | "numeric";
+  target_value: number | null;
+  unit: string | null;
+  active: boolean;
+}
+
 export default function NewHabitPage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -27,7 +36,7 @@ export default function NewHabitPage() {
     setLoading(true);
 
     try {
-      const habit = await api.post("/api/habits/", {
+      const habit = await api.post<Habit>("/api/habits/", {
         name: name.trim(),
         type,
         target_value: type === "numeric" && targetValue ? parseFloat(targetValue) : null,

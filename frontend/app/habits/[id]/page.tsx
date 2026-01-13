@@ -11,10 +11,9 @@ import Link from "next/link";
 import api from "@/lib/api/server";
 import dynamic from "next/dynamic";
 
-// Dynamically import client component to avoid SSR issues
+// Dynamically import client component
 const DeleteHabitButton = dynamic(
-  () => import("@/components/habits/DeleteHabitButton"),
-  { ssr: false }
+  () => import("@/components/habits/DeleteHabitButton")
 );
 
 interface Habit {
